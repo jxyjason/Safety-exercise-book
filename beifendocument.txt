@@ -1,0 +1,372 @@
+'打开文档动作
+Private Sub Document_Open()
+    Dim Doc As Document
+    Dim tbl As table
+    Dim cell As cell
+    Set Doc = ActiveDocument
+    
+    If Doc.Tables.Count > 0 Then '已经创建好题目表格
+        Set tbl = Doc.Tables(1) ' 检查第一个表格
+        
+        If Len(tbl.cell(1, 2).Range.text) <= 2 Then
+            MsgBox "请出题"
+        ElseIf Len(tbl.cell(2, 2).Range.text) <= 2 Then
+            MsgBox "请作答"
+        ElseIf Len(tbl.cell(3, 2).Range.text) <= 2 Then
+            MsgBox "请打分"
+        End If
+    Else '未创建题目表格，则创建
+        CreateTable
+        MsgBox "请出题"
+    End If
+    
+End Sub
+'关闭文档动作
+Private Sub Document_Close()
+    
+End Sub
+
+' 创建表格
+Private Sub CreateTable()
+    Dim Doc As Document
+    Dim tbl As table
+    Dim row As row
+    Dim cell As cell
+    Dim i As Integer
+    
+    ' 创建新文档
+    Set Doc = ActiveDocument
+    
+    ' 在文档的第一段落处插入一个五行两列的表格
+    Set tbl = Doc.Tables.Add(Doc.Paragraphs(1).Range, 6, 2)
+    
+    ' 设置表格边框样式
+    With tbl.Borders
+        .InsideLineStyle = wdLineStyleSingle ' 内部边框样式
+        .OutsideLineStyle = wdLineStyleSingle ' 外部边框样式
+    End With
+
+    ' 填充表格内容
+    For i = 1 To 6
+        ' 获取当前行
+        Set row = tbl.Rows(i)
+        ' 在第一列单元格中添加内容
+        Set cell = row.Cells(1)
+        cell.Range.text = GetColumn1Value(i) ' 替换为你的题目内容
+        ' 在第二列单元格中添加内容
+        Set cell = row.Cells(2)
+        cell.Range.text = "" ' 这里留空，可以在后面的代码中填充回答、打分、时间和签名
+        ' 调整列宽
+        tbl.Columns.AutoFit
+    Next i
+    
+' 在表格第六行第二列创建两个按钮
+' 获取第六行第二列的单元格对象
+Set cell = tbl.cell(6, 2)
+' 将光标移动到单元格的范围内
+Set rng = cell.Range
+
+' 在单元格中插入第一个按钮
+Set btn1 = Doc.InlineShapes.AddOLEControl(ClassType:="Forms.CommandButton.1", Range:=rng)
+btn1.oleFormat.Object.Caption = "验证"
+
+' 在单元格中插入第二个按钮
+Set btn2 = Doc.InlineShapes.AddOLEControl(ClassType:="Forms.CommandButton.1", Range:=rng)
+btn2.oleFormat.Object.Caption = "签名"
+
+    ' 将文档显示在 Word 中
+    Doc.Activate
+    
+End Sub
+
+' 设置表格内容
+Function GetColumn1Value(rowNumber As Integer) As String
+    Select Case rowNumber
+        Case 1
+            GetColumn1Value = "题目"
+        Case 2
+            GetColumn1Value = "回答"
+        Case 3
+            GetColumn1Value = "打分"
+        Case 4
+            GetColumn1Value = "时间"
+        Case 5
+            GetColumn1Value = "签名"
+        Case 6
+            GetColumn1Value = "选项"
+        Case Else
+            GetColumn1Value = ""
+    End Select
+End Function
+
+' 点击验证按钮事件（第一个）
+Private Sub CommandButton1_Click()
+    'MsgBox "验证"
+    Verify
+End Sub
+' 点击签名按钮事件（第二个）
+Private Sub CommandButton2_Click()
+    'MsgBox "签名"
+    Sign
+End Sub
+
+' 使用cmd命令，借用freetsa进行签名
+Private Sub Sign()
+    Dim cmdPath As String
+    Dim cmdCommand As String
+    Dim filePath As String
+    Dim fso As Object
+    Dim file As Object
+    Dim Doc As Document
+    Dim table As table
+    Dim cell As cell
+    
+    cmdPath = "C:\Windows\System32\cmd.exe"
+    filePath = "D:\file.txt"
+    
+    '获取文档MD5哈希值
+    Dim hashAnswer As String
+    hashAnswer = GenerateMD5FromAnswers()
+    
+    ' 存储hashAnswer为file.txt
+    Set fso = CreateObject("Scripting.FileSystemObject") ' 创建 FileSystemObject 对象
+    Set file = fso.CreateTextFile(filePath) ' 创建文件并打开以进行写入操作
+    file.Write hashAnswer ' 写入 hashAnswer 的值到文件中
+    file.Close ' 关闭文件
+    Set file = Nothing ' 释放对象
+    Set fso = Nothing
+    
+    '生成tsq请求文件
+    cmdCommand = "openssl ts -query -data D:\file.txt -no_nonce -sha512 -cert -out D:\file.tsq"
+    ' 运行 cmd 命令
+    Shell cmdPath & " /c " & cmdCommand, vbNormalFocus
+    
+    '生成tsr签名文件
+    cmdCommand = "powershell -Command ""Invoke-WebRequest -Uri 'https://freetsa.org/tsr' -Method POST -Headers @{'Content-Type'='application/timestamp-query'} -InFile 'D:\file.tsq' -OutFile 'D:\file.tsr'"""
+    ' 运行 cmd 命令
+    Shell cmdPath & " /c " & cmdCommand, vbNormalFocus
+    
+    WaitForSeconds (3)
+    
+    ' 将tsr签名文件存储到表格第五行第二列
+    Set Doc = ActiveDocument ' 获取当前活动的 Word 文档
+    Set table = Doc.Tables(1) ' 获取第一个表格
+    Set cell = table.cell(5, 2) ' 获取第五行第二列的单元格
+    cell.Range.InlineShapes.AddOLEObject ClassType:="Package", fileName:="D:\file.tsr", LinkToFile:=False, DisplayAsIcon:=False ' 将文件添加到单元格中
+    
+    ' 结尾：保存文档、删除先前产生的txt、tsq、tsr。
+    On Error Resume Next
+    Kill "D:\file.txt"
+    Kill "D:\file.tsq"
+    Kill "D:\file.tsr"
+    On Error GoTo 0
+    
+    ActiveDocument.Save
+    
+End Sub
+
+Function WaitForSeconds(n As Integer)
+    Dim endTime As Double
+    
+    ' 计算结束时间
+    endTime = Now + TimeValue("00:00:0" & n)
+    
+    ' 使用Do While循环等待指定的秒数
+    Do While Now < endTime
+        ' 继续等待
+    Loop
+End Function
+
+' 验证签名
+Private Sub Verify()
+    Dim cmdPath As String
+    Dim cmdCommand As String
+    Dim filePath As String
+    Dim fso As Object
+    Dim file As Object
+    
+    cmdPath = "C:\Windows\System32\cmd.exe"
+    filePath = "D:\file.txt"
+    
+    '获取文档MD5哈希值
+    Dim hashAnswer As String
+    hashAnswer = GenerateMD5FromAnswers()
+    
+    ' 存储hashAnswer为file.txt
+    Set fso = CreateObject("Scripting.FileSystemObject") ' 创建 FileSystemObject 对象
+    Set file = fso.CreateTextFile(filePath) ' 创建文件并打开以进行写入操作
+    file.Write hashAnswer ' 写入 hashAnswer 的值到文件中
+    file.Close ' 关闭文件
+    Set file = Nothing ' 释放对象
+    Set fso = Nothing
+    
+    ' 生成tsq请求文件
+    cmdCommand = "openssl ts -query -data D:\file.txt -no_nonce -sha512 -cert -out D:\file.tsq"
+    Shell cmdPath & " /c " & cmdCommand, vbNormalFocus
+
+    ' 提取tsr签名文件：将单元格中文件提取并保存到D:\file.tsr
+    ExtractAndSaveEmbeddedFiles
+    
+    ' 验证
+    'cmdCommand = "openssl ts -verify -in D:\file.tsr -queryfile D:\file.tsq -CAfile D:\cacert.pem -untrusted D:\tsa.crt"
+    'Shell cmdPath & " /c " & cmdCommand, vbNormalFocus
+    
+    RunCmdAndGetOutput
+    
+    ' 结尾：删除先前产生的txt、tsq、tsr。
+    On Error Resume Next
+    Kill "D:\file.txt"
+    Kill "D:\file.tsq"
+    Kill "D:\file.tsr"
+    On Error GoTo 0
+    
+End Sub
+'运行验证cmd命令
+Private Sub RunCmdAndGetOutput()
+    Dim objShell As Object
+    Dim cmdCommand As String
+    Dim cmdPath As String
+    Dim cmdOutput As String
+    Dim objExec As Object
+    
+    ' 设置命令和路径
+    cmdCommand = "openssl ts -verify -in D:\file.tsr -queryfile D:\file.tsq -CAfile D:\first_semester_of_senior_year\mimagongcheng\homework\homework1\tsa_sign\cacert.pem -untrusted D:\first_semester_of_senior_year\mimagongcheng\homework\homework1\tsa_sign\tsa.crt"
+    cmdPath = "C:\Windows\System32\cmd.exe"
+    
+    ' 创建WScript.Shell对象
+    Set objShell = CreateObject("WScript.Shell")
+    
+    ' 运行CMD命令
+    Set objExec = objShell.Exec(cmdPath & " /c " & cmdCommand)
+    
+    ' 读取CMD输出
+    cmdOutput = objExec.StdOut.ReadAll
+    
+    ' 显示输出
+    MsgBox "命令输出:" & vbCrLf & cmdOutput
+    
+    ' 释放对象
+    Set objExec = Nothing
+    Set objShell = Nothing
+End Sub
+
+'提取tsr文件：创建临时文件夹、提取tsr文件、复制到D:\并且删除临时文件夹
+Private Sub ExtractAndSaveEmbeddedFiles()
+    CreateFolders
+
+  ' The OLE ClassType we're looking for
+  Const OLEClassType As String = "Package"
+
+  ' These strings have actually to be variants
+  ' to make the Shell calls work
+  
+  Const vFolderTemp As Variant = "d:\temp"
+  Const vFolderTarget As Variant = "d:\target"
+  Const vVerbPaste As Variant = "Paste"
+
+  Dim i As Long
+  
+  Dim objEmbeddedShape As inlineShape
+  Dim objFolderTemp As Shell32.folder
+  Dim objFolderTarget As Shell32.folder
+  Dim objShell As Shell32.Shell
+  Dim objShellFolderItem As Shell32.ShellFolderItem
+  Dim objTempItem As Shell32.FolderItem
+  
+  i = 0
+  
+  ' Set up various Shell objects
+  Set objShell = New Shell32.Shell
+  Set objFolderTemp = objShell.Namespace(vFolderTemp)
+  Set objShellFolderItem = objShell.Namespace(vFolderTemp).Self
+  Set objFolderTarget = objShell.Namespace(vFolderTarget)
+  
+  With ActiveDocument
+    For Each objEmbeddedShape In .InlineShapes
+      If objEmbeddedShape.oleFormat.ClassType = OLEClassType Then
+        
+        ' Copy the object to the Clipboard
+        objEmbeddedShape.Range.Copy
+        
+        ' Extract to the temp folder. I don't see a reliable way either
+        ' to get the name that the Paste operation will use
+        ' (OLEFormat.IconLabel etc. do not do anything useful here)
+        ' or set it, although it would be great if .InvokeVerbEx could do it
+        objShellFolderItem.InvokeVerb vVerbPaste
+        
+        ' Change the name to something unique (and perhaps more useful)
+        ' We can't use a numeric index into the .Folder's items and even
+        ' if we could use the name, we don't know it. So iterate and
+        ' (optional) exit when we have dealt with the one item
+        For Each objTempItem In objFolderTemp.Items
+          ' We can change th ename, but we can't move the file
+          ' by changing the path/name
+          i = i + 1
+          objTempItem.Name = "file.tsr"
+          
+          ' now use the target folder object to move the file
+          ' These don't appear to *have* to be variants but...
+          ' See https://learn.microsoft.com/en-us/windows/win32/shell/folder-movehere
+          ' for the cvar(20) parameter
+          objFolderTarget.MoveHere CVar(objTempItem), CVar(20)
+          Exit For
+        Next objTempItem
+      End If
+    Next objEmbeddedShape
+  End With
+  
+  CopyAndDelete
+  
+End Sub
+
+'创建文件夹存储提取出的tsr
+Private Sub CreateFolders()
+    Dim folderPath As String
+    
+    ' 设置 temp 文件夹路径
+    folderPath = "D:\temp"
+    
+    ' 检查 temp 文件夹是否已存在
+    If Dir(folderPath, vbDirectory) = "" Then
+        ' 创建 temp 文件夹
+        MkDir folderPath
+    Else
+        MsgBox "temp 文件夹已存在"
+    End If
+    
+    ' 设置 target 文件夹路径
+    folderPath = "D:\target"
+    
+    ' 检查 target 文件夹是否已存在
+    If Dir(folderPath, vbDirectory) = "" Then
+        ' 创建 target 文件夹
+        MkDir folderPath
+    Else
+        MsgBox "target 文件夹已存在"
+    End If
+End Sub
+
+'删除临时文件夹，将tsr放到D:\
+Private Sub CopyAndDelete()
+    Dim sourcePath As String
+    Dim destinationPath As String
+
+    ' 设置源路径和目标路径
+    sourcePath = "D:\target\temp\"
+    destinationPath = "D:\"
+
+    ' 复制文件
+    FileCopy sourcePath & "file.tsr", destinationPath & "file.tsr"
+    
+    '删除文件
+    Dim cmdPath As String
+    Dim cmdCommand As String
+    cmdPath = "C:\Windows\System32\cmd.exe"
+    cmdCommand = "rd /s /q D:\target"
+    Shell cmdPath & " /c " & cmdCommand, vbNormalFocus
+    
+
+    ' 显示消息框，告诉用户操作已完成
+    'MsgBox "文件已复制到D:\，并且D:\target文件夹下的所有内容已删除。", vbInformation
+End Sub
+

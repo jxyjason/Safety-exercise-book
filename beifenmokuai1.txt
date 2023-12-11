@@ -1,0 +1,66 @@
+' 读取学生回答，并生成MD5码
+Sub GenerateMD5FromAnswers()
+    Dim doc As Document
+    Dim tbl As Table
+    Dim cell As cell
+    Dim content As String
+    Dim md5Hash As Object
+    
+    ' 获取当前打开的文档
+    Set doc = ActiveDocument
+    
+    ' 检查文档中是否已经存在表格
+    If doc.Tables.Count > 0 Then
+        Set tbl = doc.Tables(1) ' 假设你要操作第一个表格
+        
+        ' 检查表格是否有足够的行数和列数
+        If tbl.Rows.Count >= 2 And tbl.Columns.Count >= 2 Then
+            ' 获取第二行第二列单元格对象
+            Set cell = tbl.cell(2, 2)
+            
+            ' 获取单元格内容
+            content = cell.Range.text
+            
+            ' 移除换行符和其他特殊字符
+            content = Replace(content, Chr(13), "") ' 移除回车符
+            content = Replace(content, Chr(10), "") ' 移除换行符
+            content = Replace(content, Chr(9), "") ' 移除制表符
+            content = Trim(content)                ' 移除字符串两端的空格
+            
+            ' 生成MD5哈希值
+            Hash = CalculateMD5Hash(content)
+            
+            ' 显示MD5哈希值
+            MsgBox "MD5哈希值为：" & Hash
+        Else
+            MsgBox "表格行数或列数不足。"
+        End If
+    Else
+        MsgBox "文档中没有表格。"
+    End If
+End Sub
+
+' 生成文本MD5
+Function CalculateMD5Hash(inputText As String) As String
+    Dim md5Hash As Object
+    Dim bytes() As Byte
+    Dim i As Long
+    Dim Hash As String
+    
+    Set md5Hash = CreateObject("MSXML2.DOMDocument")
+    bytes = StrConv(inputText, vbFromUnicode)
+    
+    With CreateObject("System.Security.Cryptography.MD5CryptoServiceProvider")
+        .Initialize
+        bytes = .ComputeHash_2((bytes))
+    End With
+    
+    For i = LBound(bytes) To UBound(bytes)
+        Hash = Hash & Right("0" & Hex(bytes(i)), 2)
+    Next i
+    
+    CalculateMD5Hash = Hash
+End Function
+
+
+

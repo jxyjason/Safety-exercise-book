@@ -1,0 +1,16 @@
+//加密
+openssl ts -query -data file.txt -no_nonce -sha512 -cert -out file.tsq
+powershell -Command "Invoke-WebRequest -Uri 'https://freetsa.org/tsr' -Method POST -Headers @{'Content-Type'='application/timestamp-query'} -InFile 'file.tsq' -OutFile 'file.tsr'"
+
+//解密
+openssl ts -verify -in file.tsr -queryfile file.tsq -CAfile cacert.pem -untrusted tsa.crt
+
+
+//解释
+cacert.pem 和 tsa.crt 是用于验证时间戳文件的证书文件。它们在验证时间戳的签名和信任链方面起着重要的作用。
+
+cacert.pem：这是一个 CA（Certificate Authority，证书颁发机构）证书文件。它包含了信任的根证书或中间证书，用于验证时间戳文件的签名。时间戳文件通常由 TSA (Timestamping Authority，时间戳颁发机构) 使用其私钥对数据进行签名。通过提供 CA 证书文件，可以验证 TSA 签名的合法性，确保时间戳文件的可信度。cacert.pem 文件中的证书应该是你信任的 CA 证书。
+
+tsa.crt：这是一个 TSA 证书文件，其中包含了 TSA 的公钥。TSA 根据其私钥对时间戳文件进行签名，而验证方需要使用对应的公钥来验证签名。tsa.crt 文件包含了公钥，用于验证时间戳文件中的 TSA 签名的有效性。
+
+在验证时间戳文件时，你需要提供这两个证书文件。cacert.pem 用于验证时间戳文件的签名，而 tsa.crt 用于验证时间戳文件中的 TSA 签名。通过提供正确的证书文件，可以确保时间戳文件的完整性和可信度。
