@@ -111,7 +111,7 @@ Private Sub CommandButton2_Click()
 End Sub
 
 ' 使用cmd命令，借用freetsa进行签名
-Private Sub Sign()
+Sub Sign()
     Dim cmdPath As String
     Dim cmdCommand As String
     Dim filePath As String
@@ -123,6 +123,13 @@ Private Sub Sign()
     
     cmdPath = "C:\Windows\System32\cmd.exe"
     filePath = "D:\file.txt"
+    
+    '将签名时间记录
+    Dim currentTime As String
+    currentTime = Format(Now, "yyyy-mm-dd hh:mm:ss")
+    Dim targetTable As table
+    Set targetTable = ActiveDocument.Tables(1)
+    targetTable.cell(4, 2).Range.text = currentTime
     
     '获取文档MD5哈希值
     Dim hashAnswer As String
@@ -230,7 +237,7 @@ Private Sub RunCmdAndGetOutput()
     Dim objExec As Object
     
     ' 设置命令和路径
-    cmdCommand = "openssl ts -verify -in D:\file.tsr -queryfile D:\file.tsq -CAfile D:\first_semester_of_senior_year\mimagongcheng\homework\homework1\tsa_sign\cacert.pem -untrusted D:\first_semester_of_senior_year\mimagongcheng\homework\homework1\tsa_sign\tsa.crt"
+    cmdCommand = "openssl ts -verify -in D:\file.tsr -queryfile D:\file.tsq -CAfile D:\first_semester_of_senior_year\mimagongcheng\homework\Safety-exercise-book\tsa_sign\cacert.pem -untrusted D:\first_semester_of_senior_year\mimagongcheng\homework\Safety-exercise-book\tsa_sign\tsa.crt"
     cmdPath = "C:\Windows\System32\cmd.exe"
     
     ' 创建WScript.Shell对象
