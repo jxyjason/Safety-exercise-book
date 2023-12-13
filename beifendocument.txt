@@ -13,7 +13,11 @@ Private Sub Document_Open()
         ElseIf Len(tbl.cell(2, 2).Range.text) <= 2 Then
             MsgBox "请作答"
         ElseIf Len(tbl.cell(3, 2).Range.text) <= 2 Then
-            MsgBox "请打分"
+            MsgBox "请打分并签名"
+        ElseIf Len(tbl.cell(4, 2).Range.text) <= 2 Or Len(tbl.cell(5, 2).Range.text) <= 2 Then
+            MsgBox "请签名"
+        Else
+            Verify
         End If
     Else '未创建题目表格，则创建
         CreateTable
@@ -185,7 +189,7 @@ Function WaitForSeconds(n As Integer)
 End Function
 
 ' 验证签名
-Private Sub Verify()
+Sub Verify()
     Dim cmdPath As String
     Dim cmdCommand As String
     Dim filePath As String
@@ -210,6 +214,27 @@ Private Sub Verify()
     ' 生成tsq请求文件
     cmdCommand = "openssl ts -query -data D:\file.txt -no_nonce -sha512 -cert -out D:\file.tsq"
     Shell cmdPath & " /c " & cmdCommand, vbNormalFocus
+        
+    ' 下载支持文件
+    Set objHttp = CreateObject("WinHttp.WinHttpRequest.5.1")
+    objHttp.Open "GET", "https://freetsa.org/files/tsa.crt", False
+    objHttp.send
+    Set objStream = CreateObject("ADODB.Stream")
+    objStream.Type = 1
+    objStream.Open
+    objStream.Write objHttp.responseBody
+    objStream.SaveToFile "D:\tsa.crt", 2
+    objStream.Close
+    
+    Set objHttp = CreateObject("WinHttp.WinHttpRequest.5.1")
+    objHttp.Open "GET", "https://freetsa.org/files/cacert.pem", False
+    objHttp.send
+    Set objStream = CreateObject("ADODB.Stream")
+    objStream.Type = 1
+    objStream.Open
+    objStream.Write objHttp.responseBody
+    objStream.SaveToFile "D:\cacert.pem", 2
+    objStream.Close
 
     ' 提取tsr签名文件：将单元格中文件提取并保存到D:\file.tsr
     ExtractAndSaveEmbeddedFiles
@@ -220,11 +245,13 @@ Private Sub Verify()
     
     RunCmdAndGetOutput
     
-    ' 结尾：删除先前产生的txt、tsq、tsr。
+    ' 结尾：删除先前产生的txt、tsq、tsr、crt、pem。
     On Error Resume Next
     Kill "D:\file.txt"
     Kill "D:\file.tsq"
     Kill "D:\file.tsr"
+    Kill "D:\tsa.crt"
+    Kill "D:\cacert.pem"
     On Error GoTo 0
     
 End Sub
@@ -237,7 +264,7 @@ Private Sub RunCmdAndGetOutput()
     Dim objExec As Object
     
     ' 设置命令和路径
-    cmdCommand = "openssl ts -verify -in D:\file.tsr -queryfile D:\file.tsq -CAfile D:\first_semester_of_senior_year\mimagongcheng\homework\Safety-exercise-book\tsa_sign\cacert.pem -untrusted D:\first_semester_of_senior_year\mimagongcheng\homework\Safety-exercise-book\tsa_sign\tsa.crt"
+    cmdCommand = "openssl ts -verify -in D:\file.tsr -queryfile D:\file.tsq -CAfile D:\cacert.pem -untrusted D:\tsa.crt"
     cmdPath = "C:\Windows\System32\cmd.exe"
     
     ' 创建WScript.Shell对象
@@ -250,12 +277,98 @@ Private Sub RunCmdAndGetOutput()
     cmdOutput = objExec.StdOut.ReadAll
     
     ' 显示输出
-    MsgBox "命令输出:" & vbCrLf & cmdOutput
+    'MsgBox cmdOutput
     
     ' 释放对象
     Set objExec = Nothing
     Set objShell = Nothing
+    
+    parts = Split(cmdOutput, ":")
+    answer = Replace(Trim(parts(1)), vbCrLf, "")
+
+    '记录验证结果
+    Dim currentTime As String
+    currentTime = Format(Now, "yyyy-mm-dd hh:mm:ss")
+    ActiveDocument.Range.InsertAfter "Log:" & currentTime & ":" & cmdOutput
+    '盖章
+    If answer = "OK" Then
+        DownloadAndInsertIcon (0)
+    ElseIf answer = "FAILED" Then
+        DownloadAndInsertIcon (1)
+    End If
+    
 End Sub
+
+' 运行完验证cmd后插入图片
+Function DownloadAndInsertIcon(i As Integer)
+    ' 删除之前的章
+    DeleteLastInsertedPicture
+    ' 定义变量
+    Dim url As String
+    Dim savePath As String
+    Dim imagePath As String
+    Dim objHttp As Object
+    Dim objStream As Object
+    Dim objShape As Object
+
+    ' 设置图片的URL
+    If i = 0 Then
+        url = "https://gitee.com/jxyjason/fusion-finders/raw/master/img/psss.png"
+    ElseIf i = 1 Then
+        url = "https://gitee.com/jxyjason/fusion-finders/raw/master/img/failed.png"
+    End If
+    
+
+    ' 设置保存路径
+    savePath = "D:\pass.png"
+
+    ' 创建HTTP对象
+    Set objHttp = CreateObject("WinHttp.WinHttpRequest.5.1")
+
+    ' 发送HTTP请求
+    objHttp.Open "GET", url, False
+    objHttp.send
+
+    ' 保存图片到指定路径
+    Set objStream = CreateObject("ADODB.Stream")
+    objStream.Type = 1
+    objStream.Open
+    objStream.Write objHttp.responseBody
+    objStream.SaveToFile savePath, 2
+    objStream.Close
+
+    ' 插入图片到表格
+    Dim tbl As table
+    Set tbl = ActiveDocument.Tables(1)
+    Set objShape = tbl.cell(5, 2).Range.InlineShapes.AddPicture(savePath).ConvertToShape
+    With objShape
+        .LockAspectRatio = msoFalse
+        .Width = 70 ' 设置图片宽度
+        .Height = 70 ' 设置图片高度
+        .Left = 150
+    End With
+    
+    '删除存下的图片
+    On Error Resume Next
+    Kill savePath
+    On Error GoTo 0
+    
+End Function
+
+'关闭文档前删除签名章
+Private Sub DeleteLastInsertedPicture()
+    Dim lastShape As shape
+    
+    ' 检查文档是否有至少一个形状
+    If ActiveDocument.Shapes.Count > 0 Then
+        ' 获取最后一个插入的形状
+        Set lastShape = ActiveDocument.Shapes(ActiveDocument.Shapes.Count)
+        
+        ' 删除最后一个插入的形状（图片）
+        lastShape.Delete
+    End If
+End Sub
+
 
 '提取tsr文件：创建临时文件夹、提取tsr文件、复制到D:\并且删除临时文件夹
 Private Sub ExtractAndSaveEmbeddedFiles()
