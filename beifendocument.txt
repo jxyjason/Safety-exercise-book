@@ -42,7 +42,7 @@ Private Sub CreateTable()
     Set Doc = ActiveDocument
     
     ' 在文档的第一段落处插入一个五行两列的表格
-    Set tbl = Doc.Tables.Add(Doc.Paragraphs(1).Range, 6, 2)
+    Set tbl = Doc.Tables.Add(Doc.Paragraphs(1).Range, 5, 2)
     
     ' 设置表格边框样式
     With tbl.Borders
@@ -51,7 +51,7 @@ Private Sub CreateTable()
     End With
 
     ' 填充表格内容
-    For i = 1 To 6
+    For i = 1 To 5
         ' 获取当前行
         Set row = tbl.Rows(i)
         ' 在第一列单元格中添加内容
@@ -66,17 +66,17 @@ Private Sub CreateTable()
     
 ' 在表格第六行第二列创建两个按钮
 ' 获取第六行第二列的单元格对象
-Set cell = tbl.cell(6, 2)
+'Set cell = tbl.cell(6, 2)
 ' 将光标移动到单元格的范围内
-Set rng = cell.Range
+'Set rng = cell.Range
 
 ' 在单元格中插入第一个按钮
-Set btn1 = Doc.InlineShapes.AddOLEControl(ClassType:="Forms.CommandButton.1", Range:=rng)
-btn1.oleFormat.Object.Caption = "验证"
+'Set btn1 = Doc.InlineShapes.AddOLEControl(ClassType:="Forms.CommandButton.1", Range:=rng)
+'btn1.oleFormat.Object.Caption = "验证"
 
 ' 在单元格中插入第二个按钮
-Set btn2 = Doc.InlineShapes.AddOLEControl(ClassType:="Forms.CommandButton.1", Range:=rng)
-btn2.oleFormat.Object.Caption = "签名"
+'Set btn2 = Doc.InlineShapes.AddOLEControl(ClassType:="Forms.CommandButton.1", Range:=rng)
+'btn2.oleFormat.Object.Caption = "签名"
 
     ' 将文档显示在 Word 中
     Doc.Activate
@@ -96,23 +96,21 @@ Function GetColumn1Value(rowNumber As Integer) As String
             GetColumn1Value = "时间"
         Case 5
             GetColumn1Value = "签名"
-        Case 6
-            GetColumn1Value = "选项"
         Case Else
             GetColumn1Value = ""
     End Select
 End Function
 
 ' 点击验证按钮事件（第一个）
-Private Sub CommandButton1_Click()
+'Private Sub CommandButton1_Click()
     'MsgBox "验证"
-    Verify
-End Sub
+    'Verify
+'End Sub
 ' 点击签名按钮事件（第二个）
-Private Sub CommandButton2_Click()
+'Private Sub CommandButton2_Click()
     'MsgBox "签名"
-    Sign
-End Sub
+    'Sign
+'End Sub
 
 ' 使用cmd命令，借用freetsa进行签名
 Sub Sign()
@@ -124,6 +122,16 @@ Sub Sign()
     Dim Doc As Document
     Dim table As table
     Dim cell As cell
+    
+    
+    '判断是否已经签名
+    Set Doc = ActiveDocument ' 获取当前活动的 Word 文档
+    Set table = Doc.Tables(1) ' 获取第一个表格
+    Set cell = table.cell(5, 2) ' 获取第五行第二列的单元格
+    If cell.Range.InlineShapes.Count > 0 Then
+        MsgBox "您已签名。"
+        Exit Sub
+    End If
     
     cmdPath = "C:\Windows\System32\cmd.exe"
     filePath = "D:\file.txt"
@@ -253,6 +261,8 @@ Sub Verify()
     Kill "D:\tsa.crt"
     Kill "D:\cacert.pem"
     On Error GoTo 0
+    
+    ActiveDocument.Save
     
 End Sub
 '运行验证cmd命令
