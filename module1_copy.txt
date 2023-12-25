@@ -1,17 +1,17 @@
 ' 读取学生回答，并生成MD5码
-Sub GenerateMD5FromAnswers()
-    Dim doc As Document
-    Dim tbl As Table
+Function GenerateMD5FromAnswers() As String
+    Dim Doc As Document
+    Dim tbl As table
     Dim cell As cell
     Dim content As String
     Dim md5Hash As Object
     
     ' 获取当前打开的文档
-    Set doc = ActiveDocument
+    Set Doc = ActiveDocument
     
     ' 检查文档中是否已经存在表格
-    If doc.Tables.Count > 0 Then
-        Set tbl = doc.Tables(1) ' 假设你要操作第一个表格
+    If Doc.Tables.Count > 0 Then
+        Set tbl = Doc.Tables(1) ' 假设你要操作第一个表格
         
         ' 检查表格是否有足够的行数和列数
         If tbl.Rows.Count >= 2 And tbl.Columns.Count >= 2 Then
@@ -31,14 +31,16 @@ Sub GenerateMD5FromAnswers()
             Hash = CalculateMD5Hash(content)
             
             ' 显示MD5哈希值
-            MsgBox "MD5哈希值为：" & Hash
+            'MsgBox "MD5哈希值为：" & Hash
+            GenerateMD5FromAnswers = Hash
+            
         Else
             MsgBox "表格行数或列数不足。"
         End If
     Else
         MsgBox "文档中没有表格。"
     End If
-End Sub
+End Function
 
 ' 生成文本MD5
 Function CalculateMD5Hash(inputText As String) As String
@@ -61,6 +63,4 @@ Function CalculateMD5Hash(inputText As String) As String
     
     CalculateMD5Hash = Hash
 End Function
-
-
 
