@@ -23,7 +23,7 @@
 1. 创建一个.docm的文档，例如main.docm。
 2. Alt+F11打开宏编辑文件，将document_copy.txt文件内容复制到Project(Main)/Microsoft Word对象/ThisDocument中。
 3. 右键Project(Main)，点击插入--模块，添加模块1，将module1_copy.txt中内容复制到模块1中。
-4. 在 Visual Basic 编辑器中，选择 "工具" 菜单，然后选择 "引用"。这将打开 "引用" 对话框。在 "引用" 对话框中，滚动并找到 "Microsoft Shell Controls And Automation"（可能显示为 "Shell32"）。勾选该选项。
+4. 在 Visual Basic 编辑器中，选择 "工具" 菜单，然后选择 "引用"。这将打开 "引用" 对话框。在 "引用" 对话框中，滚动并找到 "Microsoft Shell Controls And Automation"（可能显示为 "Shell32"）。勾选该选项。（用于提取嵌入到文档内部的签名文件）
 5. 关闭docm文件，重新打开，脚本自动执行并创建作业表格，随后可以编辑题目、回答、打分等内容。
 6. 当需要对回答进行签名时，点击视图--宏，运行sign宏对当前回答进行签名。签名的同时程序会修改签名时间。
 7. 每次打开文档，若已经进行了签名，程序将自动验证签名并盖章。
